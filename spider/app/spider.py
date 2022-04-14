@@ -65,6 +65,24 @@ def get_latest_writeup_id() -> int:
     )
 
 
+def get_content_length(url: str) -> int:
+    """Return the size of a page.
+
+    Args:
+        url: The URL to get the content length for.
+
+    Returns:
+        The content length of the URL.
+    """
+    try:
+        response = requests.head(url=url, headers={"User-Agent": USER_AGENT})
+        if "Content-Length" not in response:
+            return None
+        return response.headers["Content-Length"]
+    except:
+        return 0
+
+
 def scrape_blog_writeup(url: str) -> str:
     """Scrape write-up from the blog page.
 
@@ -76,6 +94,15 @@ def scrape_blog_writeup(url: str) -> str:
     """
     # Remove what comes after the #
     url = url.split("#")[0]
+
+    # Check page size before proceeding (this is done to avoid downloading huge
+    # files like rockyou.txt when linked from a write-up).
+    content_length = get_content_length(url)
+
+    if content_length == 0 or content_length > 2 ** 21:
+        # Page is empty or bigger than 2MB
+        return ""
+
     # Are we dealing with a Github link? If so, then we download the raw markdown page
     # directly.
     if "gist.github.com" in url:
