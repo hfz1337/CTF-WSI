@@ -293,8 +293,11 @@ if __name__ == "__main__":
 
         writeup, code = scrape_writeup_info(writeup_id)
         if code == 200:
-            mongo[DATABASE][COLLECTION].insert_one(writeup)
-            Logger.success(f"{writeup_ctftime_url} crawled successfully.")
+            try:
+                mongo[DATABASE][COLLECTION].insert_one(writeup)
+                Logger.success(f"{writeup_ctftime_url} crawled successfully.")
+            except Exception as err:
+                Logger.error(f"{writeup_ctftime_url} crawling failed: {err}")
         elif code == 404:
             # Insert it into the database so we don't crawl it again unnecessarily.
             mongo[DATABASE][COLLECTION].insert_one(writeup)
