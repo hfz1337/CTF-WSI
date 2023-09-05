@@ -1,10 +1,12 @@
 #!/usr/bin/python3
+import json
 import os
 from typing import Tuple
+
 import requests
-from requests.exceptions import ConnectTimeout, ConnectionError
-from pymongo import MongoClient, TEXT
 from bs4 import BeautifulSoup
+from pymongo import TEXT, MongoClient
+from requests.exceptions import ConnectionError, ConnectTimeout
 
 # Load environment variables
 USER_AGENT = os.getenv("USER_AGENT")
@@ -52,7 +54,9 @@ def get_latest_writeup_id() -> int:
     Returns:
         The latest write-up ID.
     """
-    response = requests.get(url=CTFTIME_URL, headers={"User-Agent": USER_AGENT})
+    response = requests.get(
+        url=CTFTIME_URL, headers={"User-Agent": USER_AGENT}, timeout=TIMEOUT
+    )
     if response.status_code != 200:
         return None
 
@@ -75,10 +79,12 @@ def get_content_length(url: str) -> int:
         The content length of the URL.
     """
     try:
-        response = requests.head(url=url, headers={"User-Agent": USER_AGENT})
-        if "Content-Length" not in response:
+        response = requests.head(
+            url=url, headers={"User-Agent": USER_AGENT}, timeout=TIMEOUT
+        )
+        if "Content-Length" not in response.headers:
             return None
-        return response.headers["Content-Length"]
+        return int(response.headers["Content-Length"])
     except:
         return 0
 
@@ -99,7 +105,7 @@ def scrape_blog_writeup(url: str) -> str:
     # files like rockyou.txt when linked from a write-up).
     content_length = get_content_length(url)
 
-    if content_length == 0 or content_length > 2 ** 21:
+    if content_length and (content_length == 0 or content_length > 2**21):
         # Page is empty or bigger than 2MB
         return ""
 
@@ -107,27 +113,16 @@ def scrape_blog_writeup(url: str) -> str:
     # directly.
     if "gist.github.com" in url:
         url = f"{url.strip('/')}/raw"
-    elif "github.com" in url:
-        # Get direct link to the README.md file
-        if not url.endswith(".md"):
-            # Retrieve the filename, it's not always README.md in uppercase.
-            response = requests.get(url=url, headers={"User-Agent": USER_AGENT})
-            parser = BeautifulSoup(response.content, "html.parser")
-            filename = parser.select_one("#readme .Link--primary")
-            # Some people don't set a readme file, so we search for the first markdown
-            # file we find in the repo.
-            if filename:
-                filename = filename.text
-            else:
-                for element in parser.select(".js-navigation-open.Link--primary"):
-                    if element.text.endswith(".md"):
-                        filename = element.text
-                        break
-            url = f"{url.replace('tree', 'blob').strip('/')}/{filename}"
-        # Get direct link to the raw content
-        url = url.replace("github.com", "raw.githubusercontent.com").replace(
-            "/blob", "/"
-        )
+        response = requests.get(url=url, headers={"User-Agent": USER_AGENT})
+        return response.text
+
+    if "github.com" in url:
+        response = requests.get(url=url, headers={"User-Agent": USER_AGENT})
+        try:
+            data = json.loads(response.text)
+            return data["payload"]["tree"]["readme"]["richText"]
+        except Exception:
+            return ""
 
     try:
         response = requests.get(

@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import os
-from flask import Flask, request, jsonify, render_template
+
+from flask import Flask, jsonify, render_template, request
 from pymongo import MongoClient
 
 # Load environment variables
